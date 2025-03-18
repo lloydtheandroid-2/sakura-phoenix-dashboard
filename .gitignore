@@ -24,18 +24,106 @@
 .DS_Store
 *.pem
 
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-
-# env files (can opt-in for committing if needed)
-.env*
-
-# vercel
-.vercel
-
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Go Backend
+/platform/api/tmp/
+/platform/api/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+
+# SvelteKit Frontend
+/platform/dashboard/node_modules/
+/platform/dashboard/.svelte-kit/
+/platform/dashboard/build/
+/platform/dashboard/.env
+/platform/dashboard/.env.*
+!/platform/dashboard/.env.example
+/platform/dashboard/vite.config.js.timestamp-*
+/platform/dashboard/vite.config.ts.timestamp-*
+
+# Local Development
+.env
+.env.*
+!.env.example
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+deployment/istio-1.25.0
+
+# Testing
+/coverage
+.nyc_output
+
+# Production builds
+/build
+/dist
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# OS specific files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Docker
+.docker/
+
+# Kubernetes
+kubeconfig
+
+# Database
+*.db
+*.sql
+*.sqlite
+
+# MinIO / object storage
+.minio.sys/
+
+# Terraform
+.terraform/
+.terraform.lock.hcl
+terraform.tfstate
+terraform.tfstate.backup
+*.tfvars
+
+# Certificates and secrets
+*.pem
+*.key
+*.crt
+*.cer
+*.der
+*.p12
+*.pfx
+*.p8
+id_rsa*
+*.pub
+
+# Temporary files
+*~
+*.tmp
+*.temp
+.cache/
