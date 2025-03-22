@@ -7,7 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 export function getAuth() {
   // This is a hack to access auth context outside of React components
   // In a real app, you'd want to use a more robust solution
-  // @ts-ignore - This will be defined by AuthContext during runtime
+  // @ts-expect-error - This will be defined by AuthContext during runtime
   return window.__AUTH_CONTEXT || {
     token: null,
     login: null,
@@ -20,7 +20,7 @@ export function useAuthSetup() {
   const auth = useAuth();
   
   if (typeof window !== 'undefined') {
-    // @ts-ignore - Save auth context to window for the utility function
+    // @ts-expect-error - Save auth context to window for the utility function
     window.__AUTH_CONTEXT = {
       token: auth.token,
       login: auth.login,
