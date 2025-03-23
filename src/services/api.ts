@@ -1,5 +1,8 @@
+'use client'
+
 // File: platform/dashboard/src/services/api.ts
 import axios from 'axios';
+import keycloak from './keycloak';
 
 // Create an axios instance with base configuration
 const apiClient = axios.create({
@@ -11,10 +14,23 @@ const apiClient = axios.create({
 
 // Add request interceptor to add auth token
 apiClient.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('auth_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+  async (config) => {
+    // If keycloak is authenticated, ensure token is fresh and add it to requests
+    if (keycloak?.authenticated) {
+      try {
+        // Try to update the token if it's close to expiration (30 seconds)
+        const refreshed = await keycloak.updateToken(30);
+        if (refreshed) {
+          console.log('Token was successfully refreshed');
+        }
+        
+        // Add the current token to the request header
+        config.headers.Authorization = `Bearer ${keycloak.token}`;
+      } catch (error) {
+        console.error('Failed to refresh the token, or the session has expired', error);
+        // Redirect to login
+        keycloak.login();
+      }
     }
     return config;
   },
@@ -27,13 +43,32 @@ apiClient.interceptors.response.use(
   (error) => {
     // Handle 401 Unauthorized errors by redirecting to login
     if (error.response && error.response.status === 401) {
-      // Clear token and redirect to login
-      localStorage.removeItem('auth_token');
-      window.location.href = '/login';
+      console.log('Received 401 response, redirecting to login');
+      // Redirect to Keycloak login
+      if (keycloak) {
+        keycloak.login();
+      }
     }
     return Promise.reject(error);
   }
 );
+
+// Get current authentication information
+export const getAuth = () => {
+  return {
+    token: keycloak?.token,
+    isAuthenticated: !!keycloak?.authenticated,
+    login: () => keycloak?.login(),
+    logout: () => keycloak?.logout({ redirectUri: window.location.origin }),
+    userInfo: keycloak?.tokenParsed ? {
+      id: keycloak.subject,
+      username: keycloak.tokenParsed.preferred_username,
+      email: keycloak.tokenParsed.email,
+      name: keycloak.tokenParsed.name,
+      roles: keycloak.tokenParsed.realm_access?.roles || [],
+    } : null,
+  };
+};
 
 // Application service
 export const applicationService = {
@@ -76,30 +111,47 @@ export const applicationService = {
   },
 };
 
-// Authentication service
+// Authentication service - now uses Keycloak under the hood
 export const authService = {
-  // Login with username and password
-  login: async (username: string, password: string) => {
-    const response = await apiClient.post('/auth/login', { username, password });
-    const { token } = response.data;
-    localStorage.setItem('auth_token', token);
-    return response.data;
+  // Login - now redirects to Keycloak
+  login: () => {
+    if (keycloak) {
+      keycloak.login();
+    }
   },
 
-  // Register new user
+  // Register - in Keycloak this would typically be handled by the Keycloak registration page
+  // This function could be used to pre-register users in your backend before they use Keycloak
   register: async (userData: any) => {
     const response = await apiClient.post('/auth/register', userData);
     return response.data;
   },
 
-  // Logout
+  // Logout - now uses Keycloak logout
   logout: () => {
-    localStorage.removeItem('auth_token');
+    if (keycloak) {
+      keycloak.logout({ redirectUri: window.location.origin });
+    }
   },
 
-  // Check if user is authenticated
+  // Check if user is authenticated - now uses Keycloak status
   isAuthenticated: () => {
-    return !!localStorage.getItem('auth_token');
+    return !!keycloak?.authenticated;
+  },
+
+  // Get user info from Keycloak token
+  getUserInfo: () => {
+    if (!keycloak?.tokenParsed) {
+      return null;
+    }
+
+    return {
+      id: keycloak.subject,
+      username: keycloak.tokenParsed.preferred_username,
+      email: keycloak.tokenParsed.email,
+      name: keycloak.tokenParsed.name,
+      roles: keycloak.tokenParsed.realm_access?.roles || [],
+    };
   },
 };
 
