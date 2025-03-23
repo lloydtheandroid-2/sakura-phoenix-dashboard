@@ -1,17 +1,16 @@
 'use client';
 
-// File: platform/dashboard/src/pages/Applications.tsx
-import React, { useState } from 'react';
-import { Button } from '../ui/button';
-import { Heading } from '../ui/heading';
-import { Input, InputGroup } from '../ui/input';
-import { Badge } from '../ui/badge';
-import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from '../ui/dialog';
-import { Field, FieldGroup, Label } from '../ui/fieldset';
-import { Select } from '../ui/select';
-import { Text } from '../ui/text';
-import { Dropdown, DropdownButton, DropdownItem, DropdownMenu } from '../ui/dropdown';
-import { Textarea } from '../ui/textarea';
+import React, { useState, useEffect } from 'react';
+import { Button } from '../../components/ui/button';
+import { Heading } from '../../components/ui/heading';
+import { Input, InputGroup } from '../../components/ui/input';
+import { Badge } from '../../components/ui/badge';
+import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from '../../components/ui/dialog';
+import { Field, FieldGroup, Label } from '../../components/ui/fieldset';
+import { Select } from '../../components/ui/select';
+import { Text } from '../../components/ui/text';
+import { Dropdown, DropdownButton, DropdownItem, DropdownMenu } from '../../components/ui/dropdown';
+import { Textarea } from '../../components/ui/textarea';
 import { 
   EllipsisVerticalIcon, 
   MagnifyingGlassIcon, 
@@ -19,6 +18,8 @@ import {
   ArrowPathIcon,
   TrashIcon 
 } from '@heroicons/react/24/outline';
+import { useAuth } from '../../contexts/AuthContext';
+import apiClient from '../../services/api';
 
 // Define Application type
 interface Application {
@@ -36,80 +37,6 @@ interface Application {
   storage: string;
 }
 
-// Mock applications data
-const mockApplications: Application[] = [
-  { 
-    id: 'keycloak',
-    name: 'Keycloak SSO', 
-    description: 'Open Source Identity and Access Management',
-    version: '22.0.1',
-    status: 'Running', 
-    deployedAt: 'March 15, 2025',
-    imageUrl: '/apps/keycloak.svg',
-    type: 'Authentication',
-    url: 'https://keycloak.sakura-phoenix.com',
-    cpu: '2',
-    memory: '4Gi',
-    storage: '10Gi'
-  },
-  { 
-    id: 'nifi',
-    name: 'NiFi', 
-    description: 'Data flow automation and integration platform',
-    version: '1.20.0',
-    status: 'Running', 
-    deployedAt: 'March 10, 2025',
-    imageUrl: '/apps/nifi.svg',
-    type: 'Integration',
-    url: 'https://nifi.sakura-phoenix.com',
-    cpu: '4',
-    memory: '8Gi',
-    storage: '20Gi'
-  },
-  { 
-    id: 'tak-server',
-    name: 'TAK Server', 
-    description: 'Team Awareness Kit server for C2 applications',
-    version: '4.8.0',
-    status: 'Running', 
-    deployedAt: 'March 5, 2025',
-    imageUrl: '/apps/tak.svg',
-    type: 'Command & Control',
-    url: 'https://tak.sakura-phoenix.com',
-    cpu: '8',
-    memory: '16Gi',
-    storage: '100Gi'
-  },
-  { 
-    id: 'postgres',
-    name: 'PostgreSQL', 
-    description: 'Open source relational database',
-    version: '15.2',
-    status: 'Running', 
-    deployedAt: 'February 20, 2025',
-    imageUrl: '/apps/postgres.svg',
-    type: 'Database',
-    url: 'postgres.sakura-phoenix.svc.cluster.local',
-    cpu: '2',
-    memory: '4Gi',
-    storage: '50Gi'
-  },
-  { 
-    id: 'elastic',
-    name: 'ElasticSearch', 
-    description: 'Distributed search and analytics engine',
-    version: '8.7.1',
-    status: 'Pending', 
-    deployedAt: 'March 16, 2025',
-    imageUrl: '/apps/elastic.svg',
-    type: 'Search & Analytics',
-    url: 'https://elastic.sakura-phoenix.com',
-    cpu: '4',
-    memory: '8Gi',
-    storage: '50Gi'
-  }
-];
-
 // Application type options for filtering and form selection
 const applicationTypes = [
   'All',
@@ -124,11 +51,15 @@ const applicationTypes = [
 ];
 
 export default function Applications() {
+  const { isAuthenticated, hasRole } = useAuth();
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('All');
   const [isDeployDialogOpen, setIsDeployDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [newAppForm, setNewAppForm] = useState({
     name: '',
     type: 'Authentication',
@@ -140,10 +71,33 @@ export default function Applications() {
     url: ''
   });
 
+  // Fetch applications from API
+  useEffect(() => {
+    const fetchApplications = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const response = await apiClient.get('/applications');
+        setApplications(response.data);
+      } catch (err: any) {
+        console.error('Error fetching applications:', err);
+        setError(err.response?.data?.message || 'Failed to load applications');
+        // Fallback to mock data for development purposes
+        setApplications([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (isAuthenticated) {
+      fetchApplications();
+    }
+  }, [isAuthenticated]);
+
   // Filter applications based on search term and type
-  const filteredApplications = mockApplications.filter(app => {
+  const filteredApplications = applications.filter(app => {
     const matchesSearch = app.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                           app.description.toLowerCase().includes(searchTerm.toLowerCase());
+                          app.description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = filterType === 'All' || app.type === filterType;
     return matchesSearch && matchesType;
   });
@@ -156,46 +110,117 @@ export default function Applications() {
     }));
   };
 
-  const handleDeployApplication = (e: React.FormEvent) => {
+  const handleDeployApplication = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Here you would integrate with the backend API to deploy the application
-    console.log('Deploying application:', newAppForm);
+    setIsLoading(true);
     
-    // Reset form and close dialog
-    setNewAppForm({
-      name: '',
-      type: 'Authentication',
-      version: '',
-      description: '',
-      cpu: '1',
-      memory: '2Gi',
-      storage: '10Gi',
-      url: ''
-    });
-    setIsDeployDialogOpen(false);
+    try {
+      const response = await apiClient.post('/applications', {
+        name: newAppForm.name,
+        description: newAppForm.description,
+        type: newAppForm.type,
+        version: newAppForm.version,
+        cpu: newAppForm.cpu,
+        memory: newAppForm.memory,
+        storage: newAppForm.storage,
+        url: newAppForm.url
+      });
+      
+      // Add the newly created application to state
+      setApplications(prev => [...prev, response.data]);
+      
+      // Reset form and close dialog
+      setNewAppForm({
+        name: '',
+        type: 'Authentication',
+        version: '',
+        description: '',
+        cpu: '1',
+        memory: '2Gi',
+        storage: '10Gi',
+        url: ''
+      });
+      setIsDeployDialogOpen(false);
+    } catch (err: any) {
+      console.error('Error deploying application:', err);
+      setError(err.response?.data?.message || 'Failed to deploy application');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleDeleteApplication = () => {
-    // Here you would integrate with the backend API to delete the application
-    console.log('Deleting application:', selectedApp?.id);
-    setIsDeleteDialogOpen(false);
-    setSelectedApp(null);
+  const handleDeleteApplication = async () => {
+    if (!selectedApp) return;
+    
+    setIsLoading(true);
+    
+    try {
+      await apiClient.delete(`/applications/${selectedApp.id}`);
+      
+      // Remove the deleted application from state
+      setApplications(prev => prev.filter(app => app.id !== selectedApp.id));
+      setIsDeleteDialogOpen(false);
+      setSelectedApp(null);
+    } catch (err: any) {
+      console.error('Error deleting application:', err);
+      setError(err.response?.data?.message || 'Failed to delete application');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleRestartApplication = (app: Application) => {
-    // Here you would integrate with the backend API to restart the application
-    console.log('Restarting application:', app.id);
+  const handleRestartApplication = async (app: Application) => {
+    setIsLoading(true);
+    
+    try {
+      await apiClient.post(`/applications/${app.id}/restart`);
+      
+      // Update the application status in state
+      setApplications(prev => 
+        prev.map(a => 
+          a.id === app.id ? { ...a, status: 'Pending' } : a
+        )
+      );
+      
+      // Refetch applications after a delay to get updated status
+      setTimeout(async () => {
+        try {
+          const response = await apiClient.get('/applications');
+          setApplications(response.data);
+        } catch (err) {
+          console.error('Error refreshing applications:', err);
+        } finally {
+          setIsLoading(false);
+        }
+      }, 2000);
+    } catch (err: any) {
+      console.error('Error restarting application:', err);
+      setError(err.response?.data?.message || 'Failed to restart application');
+      setIsLoading(false);
+    }
   };
+
+  // Check if user has permission to deploy new applications
+  const canDeployApps = hasRole('admin') || hasRole('deployer');
 
   return (
     <div>
       <div className="flex justify-between items-center">
         <Heading>Applications</Heading>
-        <Button onClick={() => setIsDeployDialogOpen(true)}>
-          <PlusIcon className="w-5 h-5 mr-2" />
-          Deploy New App
-        </Button>
+        {canDeployApps && (
+          <Button onClick={() => setIsDeployDialogOpen(true)}>
+            <PlusIcon className="w-5 h-5 mr-2" />
+            Deploy New App
+          </Button>
+        )}
       </div>
+      
+      {error && (
+        <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg text-red-700 dark:text-red-400">
+          <p className="font-medium">Error</p>
+          <p>{error}</p>
+        </div>
+      )}
       
       <div className="mt-8 flex flex-col md:flex-row gap-4">
         <div className="flex-1">
@@ -221,89 +246,109 @@ export default function Applications() {
         </div>
       </div>
 
-      {/* Applications Grid View */}
-      <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredApplications.map((app) => (
-          <div 
-            key={app.id}
-            className="bg-white dark:bg-zinc-800 rounded-lg shadow-sm border border-zinc-200 dark:border-zinc-700 overflow-hidden"
-          >
-            <div className="p-6">
-              <div className="flex justify-between items-start">
-                <div className="flex items-center space-x-4">
-                  <div className="w-12 h-12 flex items-center justify-center bg-indigo-100 dark:bg-indigo-900 rounded-lg">
-                    <span className="text-xl font-bold text-indigo-600 dark:text-indigo-400">
-                      {app.name.substring(0, 2)}
-                    </span>
+      {isLoading && (
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        </div>
+      )}
+
+      {!isLoading && (
+        <>
+          {/* Applications Grid View */}
+          <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredApplications.map((app) => (
+              <div 
+                key={app.id}
+                className="bg-white dark:bg-zinc-800 rounded-lg shadow-sm border border-zinc-200 dark:border-zinc-700 overflow-hidden"
+              >
+                <div className="p-6">
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center space-x-4">
+                      <div className="w-12 h-12 flex items-center justify-center bg-indigo-100 dark:bg-indigo-900 rounded-lg">
+                        <span className="text-xl font-bold text-indigo-600 dark:text-indigo-400">
+                          {app.name.substring(0, 2)}
+                        </span>
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">{app.name}</h3>
+                        <p className="text-sm text-zinc-500 dark:text-zinc-400">{app.type}</p>
+                      </div>
+                    </div>
+                    <Dropdown>
+                      <DropdownButton>
+                        <EllipsisVerticalIcon className="w-5 h-5" />
+                      </DropdownButton>
+                      <DropdownMenu>
+                        <DropdownItem href={`/applications/${app.id}`}>View Details</DropdownItem>
+                        <DropdownItem href={app.url} target="_blank">Open App</DropdownItem>
+                        <DropdownItem onClick={() => handleRestartApplication(app)}>
+                          <ArrowPathIcon className="w-4 h-4 mr-2" />
+                          Restart
+                        </DropdownItem>
+                        {hasRole('admin') && (
+                          <DropdownItem 
+                            onClick={() => {
+                              setSelectedApp(app);
+                              setIsDeleteDialogOpen(true);
+                            }} 
+                            className="text-red-600 dark:text-red-400"
+                          >
+                            <TrashIcon className="w-4 h-4 mr-2" />
+                            Delete
+                          </DropdownItem>
+                        )}
+                      </DropdownMenu>
+                    </Dropdown>
                   </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">{app.name}</h3>
-                    <p className="text-sm text-zinc-500 dark:text-zinc-400">{app.type}</p>
+                  
+                  <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-300 line-clamp-2">
+                    {app.description}
+                  </p>
+                  
+                  <div className="mt-6 flex justify-between items-center">
+                    <Badge color={
+                      app.status === 'Running' 
+                        ? 'green' 
+                        : app.status === 'Pending' 
+                          ? 'yellow' 
+                          : app.status === 'Error' 
+                            ? 'red' 
+                            : 'zinc'
+                    }>
+                      {app.status}
+                    </Badge>
+                    <span className="text-sm text-zinc-500 dark:text-zinc-400">v{app.version}</span>
                   </div>
                 </div>
-                <Dropdown>
-                  <DropdownButton>
-                    <EllipsisVerticalIcon className="w-5 h-5" />
-                  </DropdownButton>
-                  <DropdownMenu>
-                    <DropdownItem href={`/applications/${app.id}`}>View Details</DropdownItem>
-                    <DropdownItem href={app.url} target="_blank">Open App</DropdownItem>
-                    <DropdownItem onClick={() => handleRestartApplication(app)}>
-                      <ArrowPathIcon className="w-4 h-4 mr-2" />
-                      Restart
-                    </DropdownItem>
-                    <DropdownItem 
-                      onClick={() => {
-                        setSelectedApp(app);
-                        setIsDeleteDialogOpen(true);
-                      }} 
-                      className="text-red-600 dark:text-red-400"
-                    >
-                      <TrashIcon className="w-4 h-4 mr-2" />
-                      Delete
-                    </DropdownItem>
-                  </DropdownMenu>
-                </Dropdown>
+                
+                <div className="px-6 py-4 bg-zinc-50 dark:bg-zinc-900/50 border-t border-zinc-200 dark:border-zinc-700">
+                  <div className="flex justify-between items-center text-xs text-zinc-500 dark:text-zinc-400">
+                    <div>CPU: {app.cpu}</div>
+                    <div>Memory: {app.memory}</div>
+                    <div>Storage: {app.storage}</div>
+                  </div>
+                </div>
               </div>
-              
-              <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-300 line-clamp-2">
-                {app.description}
-              </p>
-              
-              <div className="mt-6 flex justify-between items-center">
-                <Badge color={app.status === 'Running' ? 'green' : app.status === 'Pending' ? 'yellow' : 'red'}>
-                  {app.status}
-                </Badge>
-                <span className="text-sm text-zinc-500 dark:text-zinc-400">v{app.version}</span>
-              </div>
-            </div>
-            
-            <div className="px-6 py-4 bg-zinc-50 dark:bg-zinc-900/50 border-t border-zinc-200 dark:border-zinc-700">
-              <div className="flex justify-between items-center text-xs text-zinc-500 dark:text-zinc-400">
-                <div>CPU: {app.cpu}</div>
-                <div>Memory: {app.memory}</div>
-                <div>Storage: {app.storage}</div>
-              </div>
-            </div>
+            ))}
           </div>
-        ))}
-      </div>
 
-      {filteredApplications.length === 0 && (
-        <div className="mt-8 text-center p-12 border border-dashed border-zinc-300 dark:border-zinc-700 rounded-lg">
-          <div className="text-lg font-medium text-zinc-900 dark:text-white">No applications found</div>
-          <p className="mt-2 text-zinc-500 dark:text-zinc-400">
-            {searchTerm || filterType !== 'All' 
-              ? 'Try adjusting your search or filter criteria'
-              : 'Deploy your first application to get started'}
-          </p>
-          {(!searchTerm && filterType === 'All') && (
-            <Button onClick={() => setIsDeployDialogOpen(true)} className="mt-4">
-              <PlusIcon className="w-5 h-5 mr-2" />
-              Deploy New App
-            </Button>
+          {filteredApplications.length === 0 && (
+            <div className="mt-8 text-center p-12 border border-dashed border-zinc-300 dark:border-zinc-700 rounded-lg">
+              <div className="text-lg font-medium text-zinc-900 dark:text-white">No applications found</div>
+              <p className="mt-2 text-zinc-500 dark:text-zinc-400">
+                {searchTerm || filterType !== 'All' 
+                  ? 'Try adjusting your search or filter criteria'
+                  : 'Deploy your first application to get started'}
+              </p>
+              {(!searchTerm && filterType === 'All' && canDeployApps) && (
+                <Button onClick={() => setIsDeployDialogOpen(true)} className="mt-4">
+                  <PlusIcon className="w-5 h-5 mr-2" />
+                  Deploy New App
+                </Button>
+              )}
+            </div>
           )}
-        </div>
+        </>
       )}
 
       {/* Deploy New Application Dialog */}
@@ -443,7 +488,9 @@ export default function Applications() {
             >
               Cancel
             </Button>
-            <Button type="submit">Deploy Application</Button>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? 'Deploying...' : 'Deploy Application'}
+            </Button>
           </DialogActions>
         </form>
       </Dialog>
@@ -472,8 +519,9 @@ export default function Applications() {
           <Button 
             color="red" 
             onClick={handleDeleteApplication}
+            disabled={isLoading}
           >
-            Delete Application
+            {isLoading ? 'Deleting...' : 'Delete Application'}
           </Button>
         </DialogActions>
       </Dialog>

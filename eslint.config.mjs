@@ -14,10 +14,17 @@ const eslintConfig = [
   {
     rules: {
       // Disable rules that are causing build failures
+<<<<<<< HEAD
       "@typescript-eslint/no-unused-vars": "off", // Turn off completely
       "@typescript-eslint/no-explicit-any": "off", // Turn off completely
       "@typescript-eslint/ban-ts-comment": "off", // Turn off completely
       "@next/next/no-img-element": "off", // Turn off completely
+=======
+      "@typescript-eslint/no-unused-vars": "warn", // Downgrade to warning
+      "@typescript-eslint/no-explicit-any": "warn", // Downgrade to warning
+      "@typescript-eslint/ban-ts-comment": "warn", // Downgrade to warning
+      "@next/next/no-img-element": "warn", // Downgrade to warning
+>>>>>>> 847dd36 (Updataed components)
     },
   },
 ];

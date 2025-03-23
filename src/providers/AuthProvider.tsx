@@ -23,20 +23,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (keycloak) {
       const initKeycloak = async () => {
         try {
-          const authenticated = await keycloak.init({
+          const authenticated = await keycloak?.init({
             onLoad: 'check-sso',
             silentCheckSsoRedirectUri: window.location.origin + '/silent-check-sso.html',
           });
 
-          setIsAuthenticated(authenticated);
+          setIsAuthenticated(authenticated || false);
           
-          if (authenticated) {
+          if (authenticated && keycloak) {
             setUser({
-              id: keycloak.subject,
-              username: keycloak.tokenParsed?.preferred_username,
-              email: keycloak.tokenParsed?.email,
-              name: keycloak.tokenParsed?.name,
-              roles: keycloak.tokenParsed?.realm_access?.roles || [],
+              id: keycloak?.subject,
+              username: keycloak?.tokenParsed?.preferred_username,
+              email: keycloak?.tokenParsed?.email,
+              name: keycloak?.tokenParsed?.name,
+              roles: keycloak?.tokenParsed?.realm_access?.roles || [],
             });
           }
         } catch (error) {

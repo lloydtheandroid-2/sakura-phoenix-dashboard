@@ -2,7 +2,11 @@
 
 // File: platform/dashboard/src/services/api.ts
 import axios from 'axios';
+<<<<<<< HEAD
 import keycloak from './keycloak';
+=======
+import { getAuth } from '../utils/auth';
+>>>>>>> 847dd36 (Updataed components)
 
 // Create an axios instance with base configuration
 const apiClient = axios.create({
@@ -14,6 +18,7 @@ const apiClient = axios.create({
 
 // Add request interceptor to add auth token
 apiClient.interceptors.request.use(
+<<<<<<< HEAD
   async (config) => {
     // If keycloak is authenticated, ensure token is fresh and add it to requests
     if (keycloak?.authenticated) {
@@ -31,6 +36,12 @@ apiClient.interceptors.request.use(
         // Redirect to login
         keycloak.login();
       }
+=======
+  (config) => {
+    const auth = getAuth();
+    if (auth.token) {
+      config.headers.Authorization = `Bearer ${auth.token}`;
+>>>>>>> 847dd36 (Updataed components)
     }
     return config;
   },
@@ -43,10 +54,17 @@ apiClient.interceptors.response.use(
   (error) => {
     // Handle 401 Unauthorized errors by redirecting to login
     if (error.response && error.response.status === 401) {
+<<<<<<< HEAD
       console.log('Received 401 response, redirecting to login');
       // Redirect to Keycloak login
       if (keycloak) {
         keycloak.login();
+=======
+      // Redirect to login
+      const auth = getAuth();
+      if (auth.login) {
+        auth.login();
+>>>>>>> 847dd36 (Updataed components)
       }
     }
     return Promise.reject(error);

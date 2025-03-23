@@ -1,7 +1,8 @@
-// File: platform/dashboard/src/components/layouts/DashboardLayout.tsx
+// File: src/components/layouts/DashboardLayout.tsx
 'use client';
 
 import React from 'react';
+import { useAuth } from '../../contexts/AuthContext';
 import { Avatar } from '../ui/avatar';
 import {
   Dropdown,
@@ -45,7 +46,7 @@ import {
 import { usePathname } from 'next/navigation';
 
 // Account dropdown menu component
-function AccountDropdownMenu({ anchor }: { anchor: 'top start' | 'bottom end' }) {
+function AccountDropdownMenu({ anchor, onLogout }: { anchor: 'top start' | 'bottom end', onLogout: () => void }) {
   return (
     <DropdownMenu className="min-w-64" anchor={anchor}>
       <DropdownItem href="#">
@@ -62,7 +63,7 @@ function AccountDropdownMenu({ anchor }: { anchor: 'top start' | 'bottom end' })
         <DropdownLabel>Share feedback</DropdownLabel>
       </DropdownItem>
       <DropdownDivider />
-      <DropdownItem href="#">
+      <DropdownItem onClick={onLogout}>
         <ArrowRightStartOnRectangleIcon />
         <DropdownLabel>Sign out</DropdownLabel>
       </DropdownItem>
@@ -76,6 +77,11 @@ export function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const { user, logout } = useAuth();
+
+  const handleLogout = () => {
+    logout();
+  };
 
   return (
     <SidebarLayout
@@ -87,7 +93,7 @@ export function DashboardLayout({
               <DropdownButton as={NavbarItem}>
                 <Avatar src="/users/admin.jpg" square />
               </DropdownButton>
-              <AccountDropdownMenu anchor="bottom end" />
+              <AccountDropdownMenu anchor="bottom end" onLogout={handleLogout} />
             </Dropdown>
           </NavbarSection>
         </Navbar>
@@ -177,15 +183,17 @@ export function DashboardLayout({
                 <span className="flex min-w-0 items-center gap-3">
                   <Avatar src="/users/admin.jpg" className="size-10" square alt="" />
                   <span className="min-w-0">
-                    <span className="block truncate text-sm/5 font-medium text-zinc-950 dark:text-white">Admin</span>
+                    <span className="block truncate text-sm/5 font-medium text-zinc-950 dark:text-white">
+                      {user?.name || 'User'}
+                    </span>
                     <span className="block truncate text-xs/5 font-normal text-zinc-500 dark:text-zinc-400">
-                      admin@sakura-phoenix.com
+                      {user?.email || 'user@example.com'}
                     </span>
                   </span>
                 </span>
                 <ChevronUpIcon />
               </DropdownButton>
-              <AccountDropdownMenu anchor="top start" />
+              <AccountDropdownMenu anchor="top start" onLogout={handleLogout} />
             </Dropdown>
           </SidebarFooter>
         </Sidebar>
