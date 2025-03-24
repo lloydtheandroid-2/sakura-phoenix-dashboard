@@ -2,11 +2,7 @@
 
 // File: platform/dashboard/src/services/api.ts
 import axios from 'axios';
-<<<<<<< HEAD
-import keycloak from './keycloak';
-=======
 import { getAuth } from '../utils/auth';
->>>>>>> 847dd36 (Updataed components)
 
 // Create an axios instance with base configuration
 const apiClient = axios.create({
@@ -18,30 +14,10 @@ const apiClient = axios.create({
 
 // Add request interceptor to add auth token
 apiClient.interceptors.request.use(
-<<<<<<< HEAD
-  async (config) => {
-    // If keycloak is authenticated, ensure token is fresh and add it to requests
-    if (keycloak?.authenticated) {
-      try {
-        // Try to update the token if it's close to expiration (30 seconds)
-        const refreshed = await keycloak.updateToken(30);
-        if (refreshed) {
-          console.log('Token was successfully refreshed');
-        }
-        
-        // Add the current token to the request header
-        config.headers.Authorization = `Bearer ${keycloak.token}`;
-      } catch (error) {
-        console.error('Failed to refresh the token, or the session has expired', error);
-        // Redirect to login
-        keycloak.login();
-      }
-=======
   (config) => {
     const auth = getAuth();
     if (auth.token) {
       config.headers.Authorization = `Bearer ${auth.token}`;
->>>>>>> 847dd36 (Updataed components)
     }
     return config;
   },
@@ -54,17 +30,10 @@ apiClient.interceptors.response.use(
   (error) => {
     // Handle 401 Unauthorized errors by redirecting to login
     if (error.response && error.response.status === 401) {
-<<<<<<< HEAD
-      console.log('Received 401 response, redirecting to login');
-      // Redirect to Keycloak login
-      if (keycloak) {
-        keycloak.login();
-=======
       // Redirect to login
       const auth = getAuth();
       if (auth.login) {
         auth.login();
->>>>>>> 847dd36 (Updataed components)
       }
     }
     return Promise.reject(error);
@@ -72,19 +41,14 @@ apiClient.interceptors.response.use(
 );
 
 // Get current authentication information
-export const getAuth = () => {
+export const getAuthInfo = () => {
+  const auth = getAuth();
   return {
-    token: keycloak?.token,
-    isAuthenticated: !!keycloak?.authenticated,
-    login: () => keycloak?.login(),
-    logout: () => keycloak?.logout({ redirectUri: window.location.origin }),
-    userInfo: keycloak?.tokenParsed ? {
-      id: keycloak.subject,
-      username: keycloak.tokenParsed.preferred_username,
-      email: keycloak.tokenParsed.email,
-      name: keycloak.tokenParsed.name,
-      roles: keycloak.tokenParsed.realm_access?.roles || [],
-    } : null,
+    token: auth.token,
+    isAuthenticated: auth.isAuthenticated,
+    login: auth.login,
+    logout: auth.logout,
+    userInfo: auth.userInfo,
   };
 };
 
@@ -129,47 +93,40 @@ export const applicationService = {
   },
 };
 
-// Authentication service - now uses Keycloak under the hood
+// Authentication service - now uses the auth utility
 export const authService = {
-  // Login - now redirects to Keycloak
+  // Login
   login: () => {
-    if (keycloak) {
-      keycloak.login();
+    const auth = getAuth();
+    if (auth.login) {
+      auth.login();
     }
   },
 
-  // Register - in Keycloak this would typically be handled by the Keycloak registration page
-  // This function could be used to pre-register users in your backend before they use Keycloak
+  // Register
   register: async (userData: any) => {
     const response = await apiClient.post('/auth/register', userData);
     return response.data;
   },
 
-  // Logout - now uses Keycloak logout
+  // Logout
   logout: () => {
-    if (keycloak) {
-      keycloak.logout({ redirectUri: window.location.origin });
+    const auth = getAuth();
+    if (auth.logout) {
+      auth.logout();
     }
   },
 
-  // Check if user is authenticated - now uses Keycloak status
+  // Check if user is authenticated
   isAuthenticated: () => {
-    return !!keycloak?.authenticated;
+    const auth = getAuth();
+    return auth.isAuthenticated;
   },
 
-  // Get user info from Keycloak token
+  // Get user info
   getUserInfo: () => {
-    if (!keycloak?.tokenParsed) {
-      return null;
-    }
-
-    return {
-      id: keycloak.subject,
-      username: keycloak.tokenParsed.preferred_username,
-      email: keycloak.tokenParsed.email,
-      name: keycloak.tokenParsed.name,
-      roles: keycloak.tokenParsed.realm_access?.roles || [],
-    };
+    const auth = getAuth();
+    return auth.userInfo;
   },
 };
 

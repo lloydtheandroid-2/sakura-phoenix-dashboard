@@ -1,10 +1,6 @@
-<<<<<<< HEAD
-import { AuthProvider } from '../providers/AuthProvider';
-=======
 // File: src/app/layout.tsx
 import { AuthProvider } from '../contexts/AuthContext';
 import { AuthInitializer } from '../components/AuthInitializer';
->>>>>>> 847dd36 (Updataed components)
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -35,13 +31,9 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <AuthProvider>
-<<<<<<< HEAD
-          {children}
-=======
           <AuthInitializer>
             {children}
           </AuthInitializer>
->>>>>>> 847dd36 (Updataed components)
         </AuthProvider>
       </body>
     </html>

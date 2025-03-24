@@ -35,16 +35,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const initKeycloak = async () => {
       const keycloakInstance = new Keycloak({
-        url: process.env.NEXT_PUBLIC_KEYCLOAK_URL || 'http://localhost:8080',
+        url: process.env.NEXT_PUBLIC_KEYCLOAK_URL || 'https://auth.sakuraphoenix.us',
         realm: process.env.NEXT_PUBLIC_KEYCLOAK_REALM || 'sakura-phoenix',
-        clientId: process.env.NEXT_PUBLIC_KEYCLOAK_CLIENT_ID || 'platform-frontend',
+        clientId: process.env.NEXT_PUBLIC_KEYCLOAK_CLIENT_ID || 'dashboard-client',
       });
 
       try {
+        // Configure Keycloak to use redirect flow instead of iframe
         const authenticated = await keycloakInstance.init({
           onLoad: 'check-sso',
-          silentCheckSsoRedirectUri: window.location.origin + '/silent-check-sso.html',
+          checkLoginIframe: false, // Disable iframe checking
           pkceMethod: 'S256',
+          enableLogging: true,
+          flow: 'standard', // Use standard authorization code flow
         });
 
         setKeycloak(keycloakInstance);
