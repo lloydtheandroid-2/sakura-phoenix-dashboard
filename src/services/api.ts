@@ -13,6 +13,38 @@ const apiClient = axios.create({
   withCredentials: true,
 });
 
+// Refresh function outside the interceptor for cleaner code
+const refreshAuthToken = async () => {
+  try {
+    const response = await axios.post(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/refresh`,
+      {},
+      { withCredentials: true }
+    );
+    return response.data.success;
+  } catch (error) {
+    return false;
+  }
+};
+
+// Token refresh state management
+let isRefreshing = false;
+let refreshPromise: Promise<boolean> | null = null;
+let failedQueue: { resolve: (value: unknown) => void; reject: (reason?: any) => void }[] = [];
+
+// Process the queue of failed requests
+const processQueue = (success: boolean) => {
+  failedQueue.forEach(promise => {
+    if (success) {
+      promise.resolve(null);
+    } else {
+      promise.reject(null);
+    }
+  });
+  
+  failedQueue = [];
+};
+
 // Add request interceptor to add auth token
 apiClient.interceptors.request.use(
   (config) => {
@@ -25,15 +57,59 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Add response interceptor to handle auth errors
+// Add response interceptor to handle auth errors and token refresh
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
-    // Handle 401 Unauthorized errors by redirecting to login
-    if (error.response && error.response.status === 401) {
-      // Redirect to login
-      window.location.href = '/login';
+  async (error) => {
+    const originalRequest = error.config;
+    
+    // If error is not 401 or request has already been retried, reject
+    if (error.response?.status !== 401 || originalRequest._retry) {
+      return Promise.reject(error);
     }
+    
+    // Mark this request as retried to avoid infinite loops
+    originalRequest._retry = true;
+    
+    // If we're not already refreshing the token
+    if (!isRefreshing) {
+      isRefreshing = true;
+      refreshPromise = refreshAuthToken()
+        .then(success => {
+          processQueue(success);
+          return success;
+        })
+        .catch(() => {
+          processQueue(false);
+          return false;
+        })
+        .finally(() => {
+          isRefreshing = false;
+          refreshPromise = null;
+        });
+    }
+    
+    // If we are already refreshing, add this request to the queue
+    if (refreshPromise) {
+      try {
+        // Wait for the current refresh to complete
+        const refreshResult = await refreshPromise;
+        
+        if (refreshResult) {
+          // If refresh was successful, retry the original request
+          return apiClient(originalRequest);
+        } else {
+          // If refresh failed, redirect to login
+          window.location.href = '/login';
+          return Promise.reject(error);
+        }
+      } catch (refreshError) {
+        // If there was an error refreshing, redirect to login
+        window.location.href = '/login';
+        return Promise.reject(refreshError);
+      }
+    }
+    
     return Promise.reject(error);
   }
 );
@@ -120,6 +196,11 @@ export const authService = {
       return false;
     }
   },
+
+  // Add method to manually refresh the token if needed
+  refreshToken: async () => {
+    return refreshAuthToken();
+  }
 };
 
 export default apiClient;

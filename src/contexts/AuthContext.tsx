@@ -1,8 +1,8 @@
 // src/contexts/AuthContext.tsx
+
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import keycloak from '../services/keycloak';
 import axios from 'axios';
 
 type AuthContextType = {
@@ -11,6 +11,7 @@ type AuthContextType = {
   login: () => void;
   directLogin: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
+  refreshToken: () => Promise<boolean>;
   userInfo: any | null;
 };
 
@@ -20,6 +21,7 @@ const AuthContext = createContext<AuthContextType>({
   login: () => {},
   directLogin: async () => false,
   logout: () => {},
+  refreshToken: async () => false,
   userInfo: null,
 });
 
@@ -27,6 +29,51 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [initialized, setInitialized] = useState(false);
   const [userInfo, setUserInfo] = useState(null);
+  // Store token expiration timestamp
+  const [tokenExpiry, setTokenExpiry] = useState<number | null>(null);
+  // Reference to the refresh timer
+  const refreshTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+  
+  // Function to refresh the token
+  const refreshToken = async (): Promise<boolean> => {
+    try {
+      const response = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/refresh`,
+        {},
+        { withCredentials: true }
+      );
+      
+      if (response.data.success) {
+        // Set the new expiration time - calculate it by adding expiresIn to current time
+        const newExpiry = Date.now() + (response.data.expiresIn * 1000);
+        setTokenExpiry(newExpiry);
+        
+        // Schedule the next refresh
+        scheduleRefresh(response.data.expiresIn);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Token refresh failed:', error);
+      // If refresh fails, the user needs to log in again
+      setIsAuthenticated(false);
+      return false;
+    }
+  };
+  
+  // Schedule token refresh - called after login and after each successful refresh
+  const scheduleRefresh = (expiresIn: number) => {
+    // Clear any existing timer
+    if (refreshTimerRef.current) {
+      clearTimeout(refreshTimerRef.current);
+    }
+    
+    // Schedule refresh for 1 minute before token expires
+    const refreshTime = (expiresIn - 60) * 1000;
+    refreshTimerRef.current = setTimeout(() => {
+      refreshToken();
+    }, refreshTime > 0 ? refreshTime : 0);
+  };
   
   // Check authentication status on load
   useEffect(() => {
@@ -34,12 +81,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       try {
         // Check if user is authenticated by making a request to a protected endpoint
         const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/user/me`, {
-          withCredentials: true // Important for cookies
+          withCredentials: true
         });
         
         if (response.status === 200) {
           setIsAuthenticated(true);
           setUserInfo(response.data);
+          
+          // Since we're authenticated, let's refresh the token to get a fresh one
+          // This will also set up the refresh timer
+          await refreshToken();
         }
       } catch (error) {
         setIsAuthenticated(false);
@@ -50,6 +101,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     checkAuth();
+    
+    // Clean up refresh timer when the component unmounts
+    return () => {
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current);
+      }
+    };
   }, []);
 
   // OAuth login (redirect to Keycloak)
@@ -69,6 +127,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (response.status === 200) {
         setIsAuthenticated(true);
         setUserInfo(response.data.user);
+        
+        // Set token expiry and schedule refresh
+        if (response.data.expiresIn) {
+          const expiry = Date.now() + (response.data.expiresIn * 1000);
+          setTokenExpiry(expiry);
+          scheduleRefresh(response.data.expiresIn);
+        }
+        
         return true;
       }
       return false;
@@ -80,6 +146,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // Logout function
   const logout = async () => {
     try {
+      // Clear refresh timer
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current);
+        refreshTimerRef.current = null;
+      }
+      
       const response = await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/logout`,
         {},
@@ -99,6 +171,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     
     setIsAuthenticated(false);
     setUserInfo(null);
+    setTokenExpiry(null);
   };
 
   return (
@@ -107,7 +180,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       initialized, 
       login, 
       directLogin,
-      logout, 
+      logout,
+      refreshToken,
       userInfo 
     }}>
       {children}
