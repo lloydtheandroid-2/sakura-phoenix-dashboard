@@ -30,7 +30,7 @@ export function AuthInitializer({ children }: { children: React.ReactNode }) {
   }, [initialized, isAuthenticated, pathname, router]);
 
   if (!initialized) {
-    // Show loading spinner while Keycloak initializes
+    // Show loading spinner while auth service initializes
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-t-2 border-indigo-600"></div>

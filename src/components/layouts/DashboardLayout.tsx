@@ -1,7 +1,8 @@
 // File: src/components/layouts/DashboardLayout.tsx
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '../../contexts/AuthContext';
 import { Avatar } from '../ui/avatar';
 import {
@@ -43,7 +44,6 @@ import {
   Square2StackIcon,
   TicketIcon,
 } from '@heroicons/react/20/solid';
-import { usePathname } from 'next/navigation';
 
 // Account dropdown menu component
 function AccountDropdownMenu({ anchor, onLogout }: { anchor: 'top start' | 'bottom end', onLogout: () => void }) {
@@ -77,11 +77,31 @@ export function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const { user, logout } = useAuth();
+  const router = useRouter();
+  const { isAuthenticated, loading, user, logout } = useAuth();
+
+  useEffect(() => {
+    if (!loading && !isAuthenticated) {
+      router.push('/login');
+    }
+  }, [isAuthenticated, loading, router]);
 
   const handleLogout = () => {
     logout();
+    router.push('/login');
   };
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-t-2 border-indigo-600"></div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
 
   return (
     <SidebarLayout

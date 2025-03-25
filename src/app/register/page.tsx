@@ -6,31 +6,10 @@ import { Input } from '../../components/ui/input';
 import { Checkbox, CheckboxField } from '../../components/ui/checkbox';
 import { Field, FieldGroup, Label } from '../../components/ui/fieldset';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation'; // Updated import
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import axios from 'axios';
 
-// Mock registration service
-// In a real application, this would integrate with Keycloak or your backend API
-const registrationService = {
-  register: async (userData: {
-    firstName: string;
-    lastName: string;
-    email: string;
-    password: string;
-    organization: string;
-    role: string;
-  }): Promise<{ success: boolean; error?: string }> => {
-    // Simulate API call
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        // In a real implementation, this would validate and create the user
-        // For demo purposes, consider all registrations successful
-        console.log('Registering user:', userData);
-        resolve({ success: true });
-      }, 1000);
-    });
-  }
-};
 
 export default function Register() {
   const router = useRouter();
@@ -108,7 +87,8 @@ export default function Register() {
     setFormError(null);
     
     try {
-      const result = await registrationService.register({
+      // Connect to backend API
+      const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/register`, {
         firstName: formData.firstName,
         lastName: formData.lastName,
         email: formData.email,
@@ -117,14 +97,14 @@ export default function Register() {
         role: formData.role
       });
       
-      if (result.success) {
+      if (response.data.success) {
         // Redirect to a success page or login
         router.push('/registration-success');
       } else {
-        setFormError(result.error || 'Registration failed');
+        setFormError(response.data.error || 'Registration failed');
       }
-    } catch (err) {
-      setFormError('An unexpected error occurred');
+    } catch (err: any) {
+      setFormError(err.response?.data?.message || 'An unexpected error occurred');
       console.error(err);
     } finally {
       setIsLoading(false);

@@ -1,24 +1,26 @@
+// Create /src/middleware.ts
+
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export function middleware(request: NextRequest) {
-  // Check for auth cookie or token
-  const isAuthenticated = request.cookies.has('KEYCLOAK_SESSION');
+  const token = request.cookies.get('auth_token')?.value;
+  const isAuthPage = 
+    request.nextUrl.pathname.startsWith('/login') || 
+    request.nextUrl.pathname.startsWith('/register') ||
+    request.nextUrl.pathname.startsWith('/registration-success');
   
-  // Public routes - allow access
-  const publicPaths = ['/', '/login', '/register'];
-  if (publicPaths.some(path => request.nextUrl.pathname.startsWith(path))) {
-    return NextResponse.next();
+  if (!token && !isAuthPage && !request.nextUrl.pathname.startsWith('/_next')) {
+    return NextResponse.redirect(new URL('/login', request.url));
   }
   
-  // Protected routes - redirect to login if not authenticated
-  if (!isAuthenticated) {
-    return NextResponse.redirect(new URL('/login', request.url));
+  if (token && isAuthPage) {
+    return NextResponse.redirect(new URL('/dashboard', request.url));
   }
   
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/applications/:path*', '/settings/:path*'],
+  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
 };

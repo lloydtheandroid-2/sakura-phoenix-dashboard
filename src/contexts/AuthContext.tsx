@@ -2,130 +2,91 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import Keycloak from 'keycloak-js';
+import authService from '../services/authService';
+
+interface User {
+  id: string;
+  username: string;
+  email: string;
+  name: string;
+  roles: string[];
+}
 
 interface AuthContextType {
-  keycloak: Keycloak | null;
-  initialized: boolean;
+  user: User | null;
   isAuthenticated: boolean;
-  token: string | undefined;
-  login: () => void;
+  loading: boolean;
+  login: (username: string, password: string) => Promise<void>;
   logout: () => void;
-  user: any;
   hasRole: (role: string) => boolean;
 }
 
-const AuthContext = createContext<AuthContextType>({
-  keycloak: null,
-  initialized: false,
-  isAuthenticated: false,
-  token: undefined,
-  login: () => {},
-  logout: () => {},
-  user: null,
-  hasRole: () => false,
-});
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [keycloak, setKeycloak] = useState<Keycloak | null>(null);
-  const [initialized, setInitialized] = useState(false);
-  const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    const initKeycloak = async () => {
-      const keycloakInstance = new Keycloak({
-        url: process.env.NEXT_PUBLIC_KEYCLOAK_URL || 'https://auth.sakuraphoenix.us',
-        realm: process.env.NEXT_PUBLIC_KEYCLOAK_REALM || 'sakura-phoenix',
-        clientId: process.env.NEXT_PUBLIC_KEYCLOAK_CLIENT_ID || 'dashboard-client',
-      });
-
+    // Check if user is already logged in
+    const checkAuth = async () => {
       try {
-        // Configure Keycloak to use redirect flow instead of iframe
-        const authenticated = await keycloakInstance.init({
-          onLoad: 'check-sso',
-          checkLoginIframe: false, // Disable iframe checking
-          pkceMethod: 'S256',
-          enableLogging: true,
-          flow: 'standard', // Use standard authorization code flow
-        });
-
-        setKeycloak(keycloakInstance);
-        setInitialized(true);
-
-        // Set up token refresh
-        if (authenticated) {
-          setUpTokenRefresh(keycloakInstance);
+        if (authService.isAuthenticated()) {
+          const currentUser = authService.getCurrentUser();
+          setUser(currentUser);
+          setIsAuthenticated(true);
         }
       } catch (error) {
-        console.error('Failed to initialize Keycloak:', error);
-        setInitialized(true);
+        console.error('Error checking authentication:', error);
+        authService.logout();
+      } finally {
+        setLoading(false);
       }
     };
 
-    // Only run on client-side
-    if (typeof window !== 'undefined') {
-      initKeycloak();
-    }
-
-    return () => {
-      // Clean up
-    };
+    checkAuth();
   }, []);
 
-  const setUpTokenRefresh = (keycloakInstance: Keycloak) => {
-    // Refresh token 30 seconds before it expires
-    setInterval(() => {
-      keycloakInstance
-        .updateToken(70)
-        .then((refreshed) => {
-          if (refreshed) {
-            console.log('Token refreshed');
-          }
-        })
-        .catch(() => {
-          console.error('Failed to refresh token, logging out');
-          keycloakInstance.logout();
-        });
-    }, 60000); // Check every minute
-  };
-
-  const login = () => {
-    if (keycloak) {
-      keycloak.login();
+  const login = async (username: string, password: string) => {
+    try {
+      const data = await authService.login(username, password);
+      const currentUser = authService.getCurrentUser();
+      setUser(currentUser);
+      setIsAuthenticated(true);
+      return data;
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
     }
   };
 
   const logout = () => {
-    if (keycloak) {
-      keycloak.logout({ redirectUri: window.location.origin });
-    }
+    authService.logout();
+    setUser(null);
+    setIsAuthenticated(false);
   };
 
   const hasRole = (role: string) => {
-    return keycloak?.tokenParsed?.realm_access?.roles?.includes(role) || false;
+    return user?.roles?.includes(role) || false;
   };
 
-  const user = keycloak ? {
-    id: keycloak.subject,
-    username: keycloak.tokenParsed?.preferred_username,
-    email: keycloak.tokenParsed?.email,
-    name: keycloak.tokenParsed?.name,
-    roles: keycloak.tokenParsed?.realm_access?.roles || [],
-  } : null;
-
   const value = {
-    keycloak,
-    initialized,
-    isAuthenticated: !!keycloak?.authenticated,
-    token: keycloak?.token,
+    user,
+    isAuthenticated,
+    loading,
     login,
     logout,
-    user,
-    hasRole,
+    hasRole
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-export const useAuth = () => useContext(AuthContext);
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+}
