@@ -10,6 +10,7 @@ const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true,
 });
 
 // Add request interceptor to add auth token
@@ -31,10 +32,7 @@ apiClient.interceptors.response.use(
     // Handle 401 Unauthorized errors by redirecting to login
     if (error.response && error.response.status === 401) {
       // Redirect to login
-      const auth = getAuth();
-      if (auth.login) {
-        auth.login();
-      }
+      window.location.href = '/login';
     }
     return Promise.reject(error);
   }
@@ -95,38 +93,32 @@ export const applicationService = {
 
 // Authentication service - now uses the auth utility
 export const authService = {
-  // Login
-  login: () => {
-    const auth = getAuth();
-    if (auth.login) {
-      auth.login();
-    }
+  login: async (username: string, password: string) => {
+    const response = await apiClient.post('/auth/login', { 
+      username, 
+      password 
+    });
+    return response.data;
   },
 
   // Register
   register: async (userData: any) => {
-    const response = await apiClient.post('/auth/register', userData);
-    return response.data;
+    return apiClient.post('/auth/register', userData);
   },
 
   // Logout
-  logout: () => {
-    const auth = getAuth();
-    if (auth.logout) {
-      auth.logout();
+  logout: async () => {
+    const response = await apiClient.post('/auth/logout');
+    return response.data;
+  },
+
+  isAuthenticated: async () => {
+    try {
+      await apiClient.get('/user/me');
+      return true;
+    } catch (error) {
+      return false;
     }
-  },
-
-  // Check if user is authenticated
-  isAuthenticated: () => {
-    const auth = getAuth();
-    return auth.isAuthenticated;
-  },
-
-  // Get user info
-  getUserInfo: () => {
-    const auth = getAuth();
-    return auth.userInfo;
   },
 };
 
